@@ -87,37 +87,72 @@ export default function ShowDetail({ show }: Props) {
     released_at: "",
   })
 
-  const handleSeasonSubmit = (e: React.FormEvent) => {
+  const handleSeasonSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (editingSeason) {
-      seasonForm.put(
-        route("admin.shows.seasons.update", [show.id, editingSeason.id]),
-        {
+    try {
+      let posterUrl = seasonForm.data.poster_url;
+
+      // Upload poster first if it's a File object
+      if (seasonForm.data.poster_url && typeof seasonForm.data.poster_url !== 'string') {
+        const formData = new FormData()
+        formData.append("file", seasonForm.data.poster_url)
+        formData.append("folder", "seasons/posters")
+
+        const uploadResponse = await fetch("/admin/upload/image", {
+          method: "POST",
+          body: formData,
+          headers: getCsrfHeaders(),
+        })
+
+        const uploadData = await uploadResponse.json()
+
+        if (uploadResponse.ok && uploadData.success) {
+          posterUrl = uploadData.url;
+        } else {
+          throw new Error(uploadData.message || "Failed to upload poster")
+        }
+      }
+
+      // Prepare submission data with uploaded poster URL
+      const submissionData = {
+        ...seasonForm.data,
+        poster_url: posterUrl,
+      };
+
+      if (editingSeason) {
+        router.put(
+          route("admin.shows.seasons.update", [show.id, editingSeason.id]),
+          submissionData,
+          {
+            onSuccess: () => {
+              setSeasonDialogOpen(false)
+              setEditingSeason(null)
+              seasonForm.reset()
+              success("Season updated!", "The season has been updated successfully")
+            },
+            onError: (errors) => {
+              const errorMessage = Object.values(errors).flat().join(", ")
+              showError("Failed to update season", errorMessage)
+            },
+          }
+        )
+      } else {
+        router.post(route("admin.shows.seasons.store", show.id), submissionData, {
           onSuccess: () => {
             setSeasonDialogOpen(false)
-            setEditingSeason(null)
             seasonForm.reset()
-            success("Season updated!", "The season has been updated successfully")
+            success("Season created!", "The season has been created successfully")
           },
           onError: (errors) => {
             const errorMessage = Object.values(errors).flat().join(", ")
-            showError("Failed to update season", errorMessage)
+            showError("Failed to create season", errorMessage)
           },
-        }
-      )
-    } else {
-      seasonForm.post(route("admin.shows.seasons.store", show.id), {
-        onSuccess: () => {
-          setSeasonDialogOpen(false)
-          seasonForm.reset()
-          success("Season created!", "The season has been created successfully")
-        },
-        onError: (errors) => {
-          const errorMessage = Object.values(errors).flat().join(", ")
-          showError("Failed to create season", errorMessage)
-        },
-      })
+        })
+      }
+    } catch (error) {
+      console.error("Season creation error:", error)
+      showError("Upload failed", error instanceof Error ? error.message : "Failed to upload poster")
     }
   }
 
