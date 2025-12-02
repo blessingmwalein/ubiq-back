@@ -51,11 +51,11 @@ class AuthService
             ]);
 
             // Create default profile
-            $account->profiles()->create([
-                'name' => $user->name,
-                'is_primary' => true,
-                'maturity_rating' => 'pg13',
-            ]);
+            // $account->profiles()->create([
+            //     'name' => $user->name,
+            //     'is_primary' => true,
+            //     'maturity_rating' => 'pg13',
+            // ]);
 
             // Auto-subscribe to free package
             $this->subscribeToFreePackage($account, $freePackage);

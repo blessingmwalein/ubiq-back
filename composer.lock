@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "183716132d77dcaf723aeade9d78ae3b",
+    "content-hash": "ec6b4f830f21600c907e3d1716eedcaf",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -241,16 +241,16 @@
         },
         {
             "name": "dedoc/scramble",
-            "version": "v0.13.3",
+            "version": "v0.13.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/dedoc/scramble.git",
-                "reference": "fe275b8dbe5ab70d79e375b5b29c62385409f5e6"
+                "reference": "b827b5f96fb9f0f6069af65faeefdde9fedf4b9e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/dedoc/scramble/zipball/fe275b8dbe5ab70d79e375b5b29c62385409f5e6",
-                "reference": "fe275b8dbe5ab70d79e375b5b29c62385409f5e6",
+                "url": "https://api.github.com/repos/dedoc/scramble/zipball/b827b5f96fb9f0f6069af65faeefdde9fedf4b9e",
+                "reference": "b827b5f96fb9f0f6069af65faeefdde9fedf4b9e",
                 "shasum": ""
             },
             "require": {
@@ -309,7 +309,7 @@
             ],
             "support": {
                 "issues": "https://github.com/dedoc/scramble/issues",
-                "source": "https://github.com/dedoc/scramble/tree/v0.13.3"
+                "source": "https://github.com/dedoc/scramble/tree/v0.13.5"
             },
             "funding": [
                 {
@@ -317,7 +317,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-11-12T12:16:47+00:00"
+            "time": "2025-11-24T09:09:10+00:00"
         },
         {
             "name": "defuse/php-encryption",

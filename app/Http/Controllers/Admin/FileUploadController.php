@@ -18,7 +18,7 @@ class FileUploadController extends Controller
     public function uploadImage(Request $request)
     {
         $request->validate([
-            'file' => 'required|image|max:10240', // 10MB max
+            'file' => 'required|image', // 10MB max
             'folder' => 'nullable|string',
             'content_id' => 'nullable|exists:content_items,id',
             'type' => 'nullable|in:poster,thumbnail,backdrop',
@@ -26,17 +26,17 @@ class FileUploadController extends Controller
 
         $file = $request->file('file');
         $folder = $request->input('folder', 'images');
-        
+
         // Store file using the public disk directly (without 'public/' prefix in path)
         $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
         $relativePath = "{$folder}/{$filename}";
-        
+
         // Store in public disk
         Storage::disk('public')->putFileAs($folder, $file, $filename);
-        
+
         // Generate URL (this will correctly prepend /storage/)
         $url = Storage::disk('public')->url($relativePath);
-        
+
         return response()->json([
             'success' => true,
             'url' => $url,
@@ -51,34 +51,34 @@ class FileUploadController extends Controller
     public function uploadVideo(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm|max:512000', // 500MB max
+            'file' => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm', // 500MB max
             'folder' => 'nullable|string',
             'content_id' => 'nullable|exists:content_items,id',
         ]);
 
         $file = $request->file('file');
         $folder = $request->input('folder', 'videos');
-        
+
         // Generate unique filename
         $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
         $relativePath = "{$folder}/{$filename}";
-        
+
         // Store in public disk
         Storage::disk('public')->putFileAs($folder, $file, $filename);
         $storagePath = Storage::disk('public')->path($relativePath);
-        
+
         // Get video metadata
         $metadata = $this->getVideoMetadata($storagePath);
-        
+
         // Create video asset record if content_id is provided
         $videoAsset = null;
         if ($request->filled('content_id')) {
             // Generate unique rendition key based on resolution or use 'original'
             $resolution = $metadata['resolution'] ?? 'unknown';
-            $renditionKey = strpos($resolution, 'x') !== false 
+            $renditionKey = strpos($resolution, 'x') !== false
                 ? explode('x', $resolution)[1] . 'p' // e.g., '1080p' from '1920x1080'
                 : 'original';
-            
+
             $videoAsset = VideoAsset::create([
                 'content_item_id' => $request->input('content_id'),
                 'rendition_key' => $renditionKey,
@@ -96,7 +96,7 @@ class FileUploadController extends Controller
                 $contentItem->update(['duration_seconds' => (int)$metadata['duration']]);
             }
         }
-        
+
         return response()->json([
             'success' => true,
             'url' => Storage::disk('public')->url($relativePath),
@@ -125,21 +125,21 @@ class FileUploadController extends Controller
         $chunkIndex = $request->input('chunkIndex');
         $totalChunks = $request->input('totalChunks');
         $filename = $request->input('filename');
-        
+
         // Store chunk temporarily
         $chunkPath = "chunks/{$uploadId}";
         $request->file('chunk')->storeAs($chunkPath, "chunk_{$chunkIndex}");
-        
+
         // Check if all chunks are uploaded
         $uploadedChunks = Storage::files($chunkPath);
-        
+
         if (count($uploadedChunks) === $totalChunks) {
             // Merge all chunks
             $finalPath = $this->mergeChunks($uploadId, $filename, $totalChunks);
-            
+
             // Clean up chunks
             Storage::deleteDirectory($chunkPath);
-            
+
             return response()->json([
                 'success' => true,
                 'complete' => true,
@@ -147,7 +147,7 @@ class FileUploadController extends Controller
                 'filename' => basename($finalPath),
             ]);
         }
-        
+
         return response()->json([
             'success' => true,
             'complete' => false,
@@ -164,23 +164,23 @@ class FileUploadController extends Controller
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
         $filename = Str::random(40) . '.' . $extension;
         $finalPath = "public/videos/{$filename}";
-        
+
         $outputPath = Storage::path($finalPath);
         $outputHandle = fopen($outputPath, 'wb');
-        
+
         for ($i = 0; $i < $totalChunks; $i++) {
             $chunkPath = Storage::path("chunks/{$uploadId}/chunk_{$i}");
             $chunkHandle = fopen($chunkPath, 'rb');
-            
+
             while (!feof($chunkHandle)) {
                 fwrite($outputHandle, fread($chunkHandle, 8192));
             }
-            
+
             fclose($chunkHandle);
         }
-        
+
         fclose($outputHandle);
-        
+
         return $finalPath;
     }
 
@@ -191,17 +191,17 @@ class FileUploadController extends Controller
     {
         // This is a placeholder - you would typically use FFmpeg or similar
         // For now, return basic info
-        
+
         try {
             if (!file_exists($path)) {
                 return [];
             }
-            
+
             $size = filesize($path);
-            
+
             // You can integrate FFmpeg here for proper video metadata
             // Example: exec("ffprobe -v quiet -print_format json -show_format -show_streams '$path'", $output);
-            
+
             return [
                 'size' => $size,
                 'mime_type' => mime_content_type($path),
@@ -222,20 +222,20 @@ class FileUploadController extends Controller
         ]);
 
         $path = $request->input('path');
-        
+
         // Remove /storage prefix if present
         $path = str_replace('/storage/', '', $path);
         $fullPath = "public/{$path}";
-        
+
         if (Storage::exists($fullPath)) {
             Storage::delete($fullPath);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'File deleted successfully',
             ]);
         }
-        
+
         return response()->json([
             'success' => false,
             'message' => 'File not found',
@@ -249,7 +249,7 @@ class FileUploadController extends Controller
     {
         try {
             $videoAsset = VideoAsset::findOrFail($id);
-            
+
             // Delete the physical file if it exists
             $path = $videoAsset->hls_manifest_key;
             if ($path) {
@@ -257,15 +257,15 @@ class FileUploadController extends Controller
                 $path = str_replace('/storage/', '', $path);
                 $fullPath = str_replace('public/', '', $path);
                 $fullPath = "public/{$fullPath}";
-                
+
                 if (Storage::exists($fullPath)) {
                     Storage::delete($fullPath);
                 }
             }
-            
+
             // Delete the database record
             $videoAsset->delete();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Video deleted successfully',

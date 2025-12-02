@@ -569,7 +569,7 @@ export default function ShowDetail({ show }: Props) {
                                 className="flex items-center gap-3 p-3 rounded-md border hover:bg-muted/50 transition-colors"
                               >
                                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                                
+
                                 <div className="w-20 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                                   {episode.thumbnail_url ? (
                                     <img
@@ -596,8 +596,8 @@ export default function ShowDetail({ show }: Props) {
                                       </p>
                                     )}
                                     {episode.content_item?.video_assets && episode.content_item.video_assets.length > 0 && (
-                                      <Badge 
-                                        variant="secondary" 
+                                      <Badge
+                                        variant="secondary"
                                         className="text-xs cursor-pointer hover:opacity-80"
                                         onClick={() => {
                                           setSelectedEpisodeVideos(episode)
@@ -822,10 +822,7 @@ export default function ShowDetail({ show }: Props) {
                           key={video.id}
                           controls
                           className="w-full h-full"
-                          src={
-                            video.hls_manifest_key.startsWith('public/')
-                              ? video.hls_manifest_key.replace('public/', '/storage/')
-                              : video.hls_manifest_key
+                          src={`/storage/${video.hls_manifest_key}`
                           }
                         >
                           Your browser does not support the video tag.

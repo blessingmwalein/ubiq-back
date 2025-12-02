@@ -66,7 +66,10 @@ export default function ContentView({ content }: Props) {
   const [isUploading, setIsUploading] = useState(false)
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false)
   const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>("")
-  
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [assetToDelete, setAssetToDelete] = useState<any>(null)
+  const [showChangeVideo, setShowChangeVideo] = useState(false)
+
   const videoForm = useForm({
     video_file: null as File | null,
   })
@@ -79,7 +82,7 @@ export default function ContentView({ content }: Props) {
 
   const handleVideoUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!videoForm.data.video_file) {
       showError("No file selected", "Please select a video file to upload")
       return
@@ -164,6 +167,31 @@ export default function ContentView({ content }: Props) {
     }
   }
 
+  const handleDeleteVideo = async () => {
+    if (!assetToDelete) return
+
+    try {
+      const response = await fetch(`/admin/video-assets/${assetToDelete.id}`, {
+        method: "DELETE",
+        headers: getCsrfHeaders(),
+      })
+
+      if (response.ok) {
+        success("Video deleted!", "The video has been deleted successfully")
+        router.reload()
+      } else {
+        const data = await response.json()
+        showError("Delete failed", data.message || "Failed to delete video")
+      }
+    } catch (error) {
+      console.error("Delete error:", error)
+      showError("Delete error", "An error occurred while deleting the video")
+    } finally {
+      setConfirmDeleteOpen(false)
+      setAssetToDelete(null)
+    }
+  }
+
   const getTypeBadge = (type: string) => {
     const colors = {
       movie: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
@@ -235,7 +263,9 @@ export default function ContentView({ content }: Props) {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="videos">Videos</TabsTrigger>
+            {content.type !== "show" && (
+              <TabsTrigger value="videos">Videos</TabsTrigger>
+            )}
             <TabsTrigger value="images">Images</TabsTrigger>
             {content.type === "show" && (
               <TabsTrigger value="episodes">Seasons & Episodes</TabsTrigger>
@@ -316,113 +346,176 @@ export default function ContentView({ content }: Props) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Video Preview */}
+            {content.video_assets && content.video_assets.length > 0 && content.video_assets[0].status === 'ready' && content.video_assets[0].hls_manifest_key && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Video Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <video
+                    controls
+                    className="w-full max-w-2xl rounded-lg"
+                    src={`/storage/${content.video_assets[0].hls_manifest_key}`}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Trailer Preview */}
+            {content.trailer_url && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Trailer Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <video
+                    controls
+                    className="w-full max-w-2xl rounded-lg"
+                    src={content.trailer_url.startsWith('http') ? content.trailer_url : `/storage/${content.trailer_url}`}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Videos Tab */}
-          <TabsContent value="videos" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Video</CardTitle>
-                <CardDescription>
-                  Upload the main video file for this content.
-                  {content.type === "show" && (
-                    <span className="block mt-1 text-yellow-600 dark:text-yellow-500">
-                      Note: For TV shows, upload videos for individual episodes instead.
-                    </span>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleVideoUpload} className="space-y-4">
-                  <VideoUpload
-                    label={`Video File (${content.type === "movie" ? "Full Movie" : content.type})`}
-                    description="MP4, WebM, MOV up to 500MB"
-                    value={videoForm.data.video_file || undefined}
-                    onChange={(file) => videoForm.setData("video_file", file)}
-                    maxSize={500}
-                    disabled={content.type === "show"}
-                  />
+          {content.type !== "show" && (
+            <TabsContent value="videos" className="space-y-6">
+              {/* Upload Video Card - Show only when no videos uploaded for single-video types */}
+              {(!content.video_assets || content.video_assets.length === 0) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upload Video</CardTitle>
+                    <CardDescription>
+                      Upload the main video file for this content.
+                      {['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0 && (
+                        <span className="block mt-1 text-yellow-600 dark:text-yellow-500">
+                          Note: Only one video allowed for this content type.
+                        </span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleVideoUpload} className="space-y-4">
+                      <VideoUpload
+                        label={`Video File (${content.type === "movie" ? "Full Movie" : content.type})`}
+                        description="MP4, WebM, MOV up to 500MB"
+                        value={videoForm.data.video_file || undefined}
+                        onChange={(file) => videoForm.setData("video_file", file)}
+                        maxSize={500}
+                        disabled={['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0}
+                      />
 
-                  {content.type !== "show" && (
-                    <Button type="submit" disabled={videoForm.processing || !videoForm.data.video_file}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Video
-                    </Button>
-                  )}
-                </form>
-              </CardContent>
-            </Card>
+                      {!(content.video_assets && content.video_assets.length > 0 && ['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type)) && (
+                        <Button type="submit" disabled={videoForm.processing || !videoForm.data.video_file}>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Video
+                        </Button>
+                      )}
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Video Assets List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Uploaded Videos</CardTitle>
-                <CardDescription>
-                  Video files associated with this content
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {content.video_assets && content.video_assets.length > 0 ? (
-                  <div className="space-y-4">
-                    {content.video_assets.map((asset) => (
-                      <div
-                        key={asset.id}
-                        className="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
+              {/* Video Preview Card - Show when videos are uploaded for single-video types */}
+              {content.video_assets && content.video_assets.length > 0 && ['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Current Video</CardTitle>
+                    <CardDescription>
+                      The uploaded video for this content
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {content.video_assets[0].status === 'ready' && content.video_assets[0].hls_manifest_key && (
+                      <video
+                        controls
+                        className="w-full max-w-2xl rounded-lg"
+                        src={`/storage/${content.video_assets[0].hls_manifest_key}`}
                       >
-                        <div className="flex-shrink-0">
-                          <div className="w-32 h-20 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
-                            <Film className="w-8 h-8 text-gray-400" />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                              {asset.rendition_key}
-                            </h4>
-                            <Badge
-                              className={
-                                asset.status === 'ready'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                  : asset.status === 'processing'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                              }
-                            >
-                              {asset.status}
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                            {asset.resolution && (
-                              <p>Resolution: {asset.resolution}</p>
-                            )}
-                            {asset.file_size_mb && (
-                              <p>Size: {asset.file_size_mb} MB</p>
-                            )}
-                            {asset.bitrate && (
-                              <p>Bitrate: {asset.bitrate} kbps</p>
-                            )}
-                          </div>
-                          {asset.status === 'ready' && asset.hls_manifest_key && (
-                            <video
-                              controls
-                              className="mt-3 w-full max-w-md rounded"
-                              src={asset.hls_manifest_key.replace('public/', '/storage/')}
-                            >
-                              Your browser does not support the video tag.
-                            </video>
-                          )}
-                        </div>
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <p>Status: <Badge className={
+                          content.video_assets[0].status === 'ready'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                            : content.video_assets[0].status === 'processing'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        }>{content.video_assets[0].status}</Badge></p>
+                        {content.video_assets[0].file_size_mb && (
+                          <p>Size: {content.video_assets[0].file_size_mb} MB</p>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No videos uploaded yet. Upload a video above to get started.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowChangeVideo(!showChangeVideo)}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Change Video
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (content.video_assets && content.video_assets[0]) {
+                              setAssetToDelete(content.video_assets[0])
+                              setConfirmDeleteOpen(true)
+                            }
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+
+                    {showChangeVideo && (
+                      <div className="border-t pt-4">
+                        <form onSubmit={handleVideoUpload} className="space-y-4">
+                          <VideoUpload
+                            label="New Video File"
+                            description="MP4, WebM, MOV up to 500MB"
+                            value={videoForm.data.video_file || undefined}
+                            onChange={(file) => videoForm.setData("video_file", file)}
+                            maxSize={500}
+                          />
+                          <div className="flex gap-2">
+                            <Button type="submit" disabled={videoForm.processing || !videoForm.data.video_file}>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Upload New Video
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setShowChangeVideo(false)
+                                videoForm.reset()
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+
+            </TabsContent>
+          )}
 
           {/* Images Tab */}
           <TabsContent value="images" className="space-y-6">
@@ -675,6 +768,26 @@ export default function ContentView({ content }: Props) {
         </Tabs>
       </div>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this video? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteVideo}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Video Player Dialog */}
       <Dialog open={videoPlayerOpen} onOpenChange={setVideoPlayerOpen}>
         <DialogContent className="max-w-4xl">
@@ -691,7 +804,8 @@ export default function ContentView({ content }: Props) {
                 controls
                 autoPlay
                 className="w-full h-full"
-                src={selectedVideoUrl}
+                src={`/storage/${selectedVideoUrl}`}
+
               >
                 Your browser does not support the video tag.
               </video>
