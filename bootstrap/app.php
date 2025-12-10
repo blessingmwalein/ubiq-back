@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         // Apply CORS middleware globally (before other middleware)
-        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
+        // $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
 
         $middleware->web(append: [
             HandleAppearance::class,
