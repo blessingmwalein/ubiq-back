@@ -7,10 +7,16 @@ CORS errors on production: `No 'Access-Control-Allow-Origin' header is present o
 
 ### 1. Update Production Environment Variables
 
-Add this to your **production** `.env` file on the server:
+Add these to your **production** `.env` file on the server:
 
 ```bash
+# CORS Configuration
 CORS_ALLOWED_ORIGINS="https://ubiqent.com,https://www.ubiqent.com,https://backend.ubiqent.com"
+
+# Session Configuration for Cross-Domain (fixes CSRF issues)
+SESSION_DOMAIN=.ubiqent.com
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=none
 ```
 
 ### 2. Clear Configuration Cache on Production

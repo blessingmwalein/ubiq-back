@@ -18,7 +18,7 @@ class FileUploadController extends Controller
     public function uploadImage(Request $request)
     {
         $request->validate([
-            'file' => 'required|image', // 10MB max
+            'file' => 'required|image|max:102400', // 100MB max
             'folder' => 'nullable|string',
             'content_id' => 'nullable|exists:content_items,id',
             'type' => 'nullable|in:poster,thumbnail,backdrop',
@@ -51,7 +51,7 @@ class FileUploadController extends Controller
     public function uploadVideo(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm', // 500MB max
+            'file' => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm|max:5120000', // 5GB max
             'folder' => 'nullable|string',
             'content_id' => 'nullable|exists:content_items,id',
         ]);
