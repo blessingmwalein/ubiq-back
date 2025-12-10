@@ -13,22 +13,24 @@ class CorsMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Handle preflight requests
+        $allowedOrigin = 'https://ubiqent.com';
+
         if ($request->isMethod('OPTIONS')) {
             return response('', 200)
-                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Origin', $allowedOrigin)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
                 ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin')
+                ->header('Access-Control-Allow-Credentials', 'true')
                 ->header('Access-Control-Max-Age', '86400');
         }
 
         $response = $next($request);
 
-        // Add CORS headers to all responses
         return $response
-            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Origin', $allowedOrigin)
             ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
             ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin')
-            ->header('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type');
+            ->header('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type')
+            ->header('Access-Control-Allow-Credentials', 'true');
     }
 }
