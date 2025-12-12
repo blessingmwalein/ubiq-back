@@ -130,8 +130,8 @@ Route::middleware('auth:api')->group(function () {
     });
     
     Route::prefix('profiles')->group(function () {
-        Route::put('{profileId}', [AccountController::class, 'updateProfile'])->name('api.profiles.update');
-        Route::delete('{profileId}', [AccountController::class, 'deleteProfile'])->name('api.profiles.delete');
+        Route::put('{profileId}', [AccountController::class, 'updateProfile'])->name('api.profiles.legacy.update');
+        Route::delete('{profileId}', [AccountController::class, 'deleteProfile'])->name('api.profiles.legacy.delete');
     });
     
     // Subscription Routes
