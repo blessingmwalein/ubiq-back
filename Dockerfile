@@ -1,53 +1,35 @@
-# -----------------------------
-# 1️⃣ Builder Stage
-# -----------------------------
-FROM php:8.2-fpm AS builder
+FROM unit:1.34.1-php8.3
 
-WORKDIR /var/www
+RUN apt update && apt install -y \
+    curl unzip git libicu-dev libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libssl-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) pcntl opcache pdo pdo_mysql intl zip gd exif ftp bcmath \
+    && pecl install redis \
+    && docker-php-ext-enable redis
 
-# System deps
-RUN apt-get update && apt-get install -y \
-    git curl zip unzip nodejs npm \
-    libpng-dev libonig-dev libxml2-dev libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring zip gd
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/custom.ini \
+    && echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/custom.ini \
+    && echo "opcache.jit_buffer_size=256M" >> /usr/local/etc/php/conf.d/custom.ini \
+    && echo "memory_limit=512M" > /usr/local/etc/php/conf.d/custom.ini \        
+    && echo "upload_max_filesize=64M" >> /usr/local/etc/php/conf.d/custom.ini \
+    && echo "post_max_size=64M" >> /usr/local/etc/php/conf.d/custom.ini
 
-# Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-# Copy only composer files first (better cache)
-COPY composer.json composer.lock ./
+WORKDIR /var/www/html
 
-# 🔑 IMPORTANT: no scripts, no env needed
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --prefer-dist \
-    --optimize-autoloader \
-    --no-scripts
+RUN mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copy rest of app
+RUN chown -R unit:unit /var/www/html/storage bootstrap/cache && chmod -R 775 /var/www/html/storage
+
 COPY . .
 
-# Build React / Vite
-RUN npm install
-RUN npm run build
+RUN chown -R unit:unit storage bootstrap/cache && chmod -R 775 storage bootstrap/cache
 
+RUN composer install --prefer-dist --optimize-autoloader --no-interaction
 
-# -----------------------------
-# 2️⃣ Runtime Stage
-# -----------------------------
-FROM php:8.2-fpm
+COPY unit.json /docker-entrypoint.d/unit.json
 
-WORKDIR /var/www
+EXPOSE 8000
 
-RUN apt-get update && apt-get install -y \
-    libpng-dev libzip-dev \
-    && docker-php-ext-install pdo_mysql zip gd \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /var/www /var/www
-
-RUN chown -R www-data:www-data storage bootstrap/cache
-
-EXPOSE 9000
-CMD ["php-fpm"]
+CMD ["unitd", "--no-daemon"]
