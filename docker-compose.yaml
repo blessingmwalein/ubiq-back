@@ -8,22 +8,8 @@ services:
       target: app
     container_name: laravel_app
     restart: always
-    volumes:
-      - ./:/var/www
-    networks:
-      - app_network
-
-  nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: nginx
-    container_name: laravel_nginx
-    restart: always
     ports:
-      - "80:80"
-    depends_on:
-      - app
+      - "9000"
     networks:
       - app_network
 
