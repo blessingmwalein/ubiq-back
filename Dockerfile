@@ -37,12 +37,3 @@ COPY --from=builder /var/www /var/www
 # Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# -----------------------------
-# 3️⃣ Nginx Container
-# -----------------------------
-FROM nginx:1.25-alpine AS nginx
-
-COPY ./docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=app /var/www /var/www
-
-EXPOSE 80
