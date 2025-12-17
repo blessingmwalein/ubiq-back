@@ -1,84 +1,49 @@
-# nixpacks.toml for Laravel + Frontend (Vite/React/Vue) + Nginx
+# nixpacks.toml
 [phases.setup]
+# Install system dependencies for Ubuntu
 commands = [
-    # System dependencies for Laravel + Node
-    "apk add --no-cache bash git unzip curl libpng-dev libzip-dev oniguruma-dev nodejs npm",
-    
-    # PHP extensions
-    "docker-php-ext-install pdo_mysql mbstring bcmath gd",
-    "pecl install redis && docker-php-ext-enable redis"
+  "apt-get update",
+  "apt-get install -y bash git unzip curl libpng-dev libzip-dev libonig-dev nodejs npm php-cli php-mbstring php-bcmath php-gd php-xml composer",
+  "pecl install redis && docker-php-ext-enable redis"
+]
+
+[phases.install]
+# Install PHP dependencies using Composer
+commands = [
+  "composer install --no-interaction --optimize-autoloader",
+  "npm install"
 ]
 
 [phases.build]
+# Build frontend assets
 commands = [
-    # PHP backend
-    "composer install --no-dev --optimize-autoloader",
-    "php artisan key:generate --force",
-    "php artisan config:cache",
-    "php artisan route:cache",
-    "php artisan view:cache",
-    
-    # Frontend
-    "npm install --legacy-peer-deps",
-    "npm run build"
+  "npm run build"
 ]
 
 [phases.start]
+# Start Laravel using PHP's built-in server
+# You can change to php-fpm + nginx if preferred
 commands = [
-    # Start PHP-FPM in background
-    "php-fpm &",
-
-    # Start Nginx
-    "nginx -g 'daemon off;'"
+  "php artisan migrate --force",
+  "php artisan config:cache",
+  "php artisan route:cache",
+  "php artisan serve --host=0.0.0.0 --port=8080"
 ]
 
 [env]
-APP_DEBUG = "true"
 APP_ENV = "local"
-APP_FAKER_LOCALE = "en_US"
-APP_FALLBACK_LOCALE = "en"
+APP_DEBUG = "true"
 APP_KEY = "base64:VhJATqhqOR/4CFZWiggi6IfKQEOVo1ZKvOSnOhlhU34="
-APP_LOCALE = "en"
-APP_MAINTENANCE_DRIVER = "file"
-APP_NAME = "Laravel"
 APP_URL = "https://backend.ubiqent.com/"
-AWS_ACCESS_KEY_ID = ""
-AWS_BUCKET = ""
-AWS_DEFAULT_REGION = "us-east-1"
-AWS_SECRET_ACCESS_KEY = ""
-AWS_USE_PATH_STYLE_ENDPOINT = "false"
-BCRYPT_ROUNDS = "12"
-BROADCAST_CONNECTION = "log"
-CACHE_STORE = "database"
-CORS_ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173,https://ubiqent.com,https://www.ubiqent.com"
 DB_CONNECTION = "mysql"
-DB_DATABASE = "mysql-database-a8kgokko4wwcg0g8kows0880"
 DB_HOST = "a8kgokko4wwcg0g8kows0880"
-DB_PASSWORD = "Rc1eyp4iWPZcoM3T0Huz6UGadIb4be2k1RGSMmimEG3j4QDe5gBeUIblwf56jZLK"
 DB_PORT = "3306"
+DB_DATABASE = "mysql-database-a8kgokko4wwcg0g8kows0880"
 DB_USERNAME = "mysql"
-FILESYSTEM_DISK = "local"
-LOG_CHANNEL = "stack"
-MAIL_FROM_ADDRESS = "hello@example.com"
-MAIL_FROM_NAME = "${APP_NAME}"
-MAIL_HOST = "127.0.0.1"
-MAIL_MAILER = "log"
-QUEUE_CONNECTION = "database"
-REDIS_CLIENT = "phpredis"
+DB_PASSWORD = "Rc1eyp4iWPZcoM3T0Huz6UGadIb4be2k1RGSMmimEG3j4QDe5gBeUIblwf56jZLK"
 REDIS_HOST = "127.0.0.1"
-REDIS_PASSWORD = "null"
 REDIS_PORT = "6379"
-SESSION_DOMAIN = ".ubiqent.com"
+FILESYSTEM_DISK = "local"
 SESSION_DRIVER = "database"
-SESSION_LIFETIME = "120"
-SESSION_PATH = "/"
-SESSION_SAME_SITE = "none"
-SESSION_SECURE_COOKIE = "true"
-VITE_APP_NAME = "${APP_NAME}"
-
-[ports]
-expose = ["80"]
-
-[static]
-# optional: if you have built frontend assets in "public/dist" or "public/build"
-root = "public"
+QUEUE_CONNECTION = "database"
+MAIL_MAILER = "log"
