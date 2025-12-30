@@ -14,7 +14,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 WORKDIR /var/www/html
 
-COPY --chown=www-data:www-data composer.json composer.lock package.json package-lock.json ./
+# Copy composer files for dependency installation
+COPY --chown=www-data:www-data composer.json composer.lock ./
 
 USER www-data
 
@@ -26,7 +27,10 @@ RUN composer install \
     --optimize-autoloader \
     --no-scripts
 
-# Install JS deps
+# Copy package.json for Node.js dependencies
+COPY --chown=www-data:www-data package.json ./
+
+# Install JS deps and generate lock file if it doesn't exist
 RUN npm install --production=false
 
 # Copy application
