@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress"
 interface VideoUploadProps {
   value?: string | File
   onChange: (file: File | null) => void
+  progress?: number
   onUploadProgress?: (progress: number) => void
   label?: string
   description?: string
@@ -22,6 +23,7 @@ export function VideoUpload({
   value,
   onChange,
   onUploadProgress,
+  progress = 0,
   label,
   description,
   maxSize = 500, // 500MB default for videos
@@ -32,7 +34,6 @@ export function VideoUpload({
 }: VideoUploadProps) {
   const [preview, setPreview] = React.useState<string | null>(null)
   const [isDragging, setIsDragging] = React.useState(false)
-  const [uploadProgress, setUploadProgress] = React.useState(0)
   const [isProcessing, setIsProcessing] = React.useState(false)
   const [fileInfo, setFileInfo] = React.useState<{
     name: string
@@ -54,7 +55,7 @@ export function VideoUpload({
     } else if (value instanceof File) {
       const objectUrl = URL.createObjectURL(value)
       setPreview(objectUrl)
-      
+
       // Get file info
       setFileInfo({
         name: value.name,
@@ -84,7 +85,7 @@ export function VideoUpload({
     }
 
     setIsProcessing(true)
-    
+
     // Simulate processing/validation
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -129,7 +130,6 @@ export function VideoUpload({
 
   const handleRemove = () => {
     onChange(null)
-    setUploadProgress(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -139,7 +139,7 @@ export function VideoUpload({
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
     const secs = Math.floor(seconds % 60)
-    
+
     if (hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
     }
@@ -178,7 +178,7 @@ export function VideoUpload({
               controls
               className="w-full h-64 rounded-lg bg-black"
             />
-            
+
             {fileInfo && (
               <div className="mt-2 p-3 bg-muted rounded-md space-y-1">
                 <p className="text-sm font-medium truncate">{fileInfo.name}</p>
@@ -229,11 +229,11 @@ export function VideoUpload({
           </div>
         )}
 
-        {uploadProgress > 0 && uploadProgress < 100 && (
+        {progress > 0 && (
           <div className="mt-2 space-y-1">
-            <Progress value={uploadProgress} />
+            <Progress value={progress} />
             <p className="text-xs text-muted-foreground text-center">
-              Uploading... {uploadProgress}%
+              Uploading... {progress}%
             </p>
           </div>
         )}

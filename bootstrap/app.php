@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust all proxies (Coolify/Traefik reverse proxy)
+        $middleware->trustProxies(at: '*');
+        
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
         
         // Exclude upload routes from CSRF verification

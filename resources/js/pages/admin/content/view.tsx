@@ -94,29 +94,51 @@ export default function ContentView({ content }: Props) {
     formData.append("folder", "videos")
     formData.append("content_id", content.id)
 
-    try {
-      const response = await fetch("/admin/upload/video", {
-        method: "POST",
-        body: formData,
-        headers: getCsrfHeaders(),
-      })
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", "/admin/upload/video")
 
-      const data = await response.json()
+    // Add CSRF headers
+    const headers = getCsrfHeaders() as Record<string, string>
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value)
+    })
 
-      if (response.ok && data.success) {
-        success("Video uploaded!", "The video has been uploaded successfully")
-        videoForm.reset()
-        router.reload()
-      } else {
-        showError("Upload failed", data.message || "Failed to upload video")
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100)
+        setUploadProgress(percentComplete)
       }
-    } catch (error) {
-      console.error("Upload error:", error)
-      showError("Upload error", "An error occurred while uploading the video")
-    } finally {
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          if (data.success) {
+            success("Video uploaded!", "The video has been uploaded successfully")
+            videoForm.reset()
+            router.reload()
+          } else {
+            showError("Upload failed", data.message || "Failed to upload video")
+          }
+        } catch (e) {
+          console.error("Parse error:", e)
+          showError("Upload failed", "Invalid response from server")
+        }
+      } else {
+        showError("Upload failed", "Server returned an error")
+      }
       setIsUploading(false)
       setUploadProgress(0)
     }
+
+    xhr.onerror = () => {
+      showError("Upload error", "An error occurred while uploading the video")
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
+
+    xhr.send(formData)
   }
 
   const handleImageUpload = async (type: 'poster' | 'thumbnail' | 'backdrop', file: File | null) => {
@@ -409,13 +431,14 @@ export default function ContentView({ content }: Props) {
                         value={videoForm.data.video_file || undefined}
                         onChange={(file) => videoForm.setData("video_file", file)}
                         maxSize={500}
-                        disabled={['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0}
+                        progress={uploadProgress}
+                        disabled={isUploading || (['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0)}
                       />
 
                       {!(content.video_assets && content.video_assets.length > 0 && ['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type)) && (
-                        <Button type="submit" disabled={videoForm.processing || !videoForm.data.video_file}>
+                        <Button type="submit" disabled={isUploading || !videoForm.data.video_file}>
                           <Upload className="mr-2 h-4 w-4" />
-                          Upload Video
+                          {isUploading ? "Uploading..." : "Upload Video"}
                         </Button>
                       )}
                     </form>
@@ -489,11 +512,13 @@ export default function ContentView({ content }: Props) {
                             value={videoForm.data.video_file || undefined}
                             onChange={(file) => videoForm.setData("video_file", file)}
                             maxSize={500}
+                            progress={uploadProgress}
+                            disabled={isUploading}
                           />
                           <div className="flex gap-2">
-                            <Button type="submit" disabled={videoForm.processing || !videoForm.data.video_file}>
+                            <Button type="submit" disabled={isUploading || !videoForm.data.video_file}>
                               <Upload className="mr-2 h-4 w-4" />
-                              Upload New Video
+                              {isUploading ? "Uploading..." : "Upload New Video"}
                             </Button>
                             <Button
                               type="button"
