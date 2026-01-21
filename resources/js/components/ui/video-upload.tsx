@@ -9,6 +9,8 @@ interface VideoUploadProps {
   value?: string | File
   onChange: (file: File | null) => void
   progress?: number
+  uploadSpeed?: number // in MB/s
+  estimatedTimeRemaining?: number // in seconds
   onUploadProgress?: (progress: number) => void
   label?: string
   description?: string
@@ -24,9 +26,11 @@ export function VideoUpload({
   onChange,
   onUploadProgress,
   progress = 0,
+  uploadSpeed = 0,
+  estimatedTimeRemaining = 0,
   label,
   description,
-  maxSize = 500, // 500MB default for videos
+  maxSize = 2048, // 2GB default for videos (2048MB)
   accept = "video/*",
   className,
   error,
@@ -74,13 +78,19 @@ export function VideoUpload({
   }
 
   const handleFileSelect = async (file: File) => {
+    // Validate file size
     if (file.size > maxSize * 1024 * 1024) {
-      alert(`File size must be less than ${maxSize}MB`)
+      const fileSizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2)
+      const maxSizeGB = (maxSize / 1024).toFixed(2)
+      alert(
+        `File size (${fileSizeGB}GB) exceeds the maximum allowed size of ${maxSizeGB}GB (${maxSize}MB).\n\nPlease select a smaller video file.`
+      )
       return
     }
 
+    // Validate file type
     if (!file.type.startsWith("video/")) {
-      alert("Please select a video file")
+      alert("Please select a video file. Supported formats: MP4, WebM, MOV")
       return
     }
 
@@ -222,7 +232,7 @@ export function VideoUpload({
                   or drag and drop
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  MP4, WebM, MOV up to {maxSize}MB
+                  MP4, WebM, MOV up to {maxSize >= 1024 ? `${(maxSize / 1024).toFixed(1)}GB` : `${maxSize}MB`}
                 </p>
               </>
             )}
@@ -230,11 +240,25 @@ export function VideoUpload({
         )}
 
         {progress > 0 && (
-          <div className="mt-2 space-y-1">
-            <Progress value={progress} />
-            <p className="text-xs text-muted-foreground text-center">
-              Uploading... {progress}%
-            </p>
+          <div className="mt-2 space-y-2">
+            <Progress value={progress} className="h-2" />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-medium">
+                Uploading... {progress}%
+              </span>
+              {uploadSpeed > 0 && (
+                <span>
+                  {uploadSpeed.toFixed(1)} MB/s
+                </span>
+              )}
+            </div>
+            {estimatedTimeRemaining > 0 && (
+              <p className="text-xs text-muted-foreground text-center">
+                {estimatedTimeRemaining < 60
+                  ? `${Math.ceil(estimatedTimeRemaining)} seconds remaining`
+                  : `${Math.ceil(estimatedTimeRemaining / 60)} minutes remaining`}
+              </p>
+            )}
           </div>
         )}
 

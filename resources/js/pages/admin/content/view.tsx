@@ -63,6 +63,8 @@ interface Props {
 export default function ContentView({ content }: Props) {
   const { success, error: showError } = useToast()
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadSpeed, setUploadSpeed] = useState(0)
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false)
   const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>("")
@@ -88,7 +90,22 @@ export default function ContentView({ content }: Props) {
       return
     }
 
+    // Validate file size (2GB = 2048MB)
+    const maxSizeBytes = 2048 * 1024 * 1024
+    if (videoForm.data.video_file.size > maxSizeBytes) {
+      const fileSizeGB = (videoForm.data.video_file.size / (1024 * 1024 * 1024)).toFixed(2)
+      showError(
+        "File too large",
+        `File size (${fileSizeGB}GB) exceeds the maximum allowed size of 2GB. Please select a smaller video file.`
+      )
+      return
+    }
+
     setIsUploading(true)
+    setUploadProgress(0)
+    setUploadSpeed(0)
+    setEstimatedTimeRemaining(0)
+
     const formData = new FormData()
     formData.append("file", videoForm.data.video_file)
     formData.append("folder", "videos")
@@ -103,10 +120,33 @@ export default function ContentView({ content }: Props) {
       xhr.setRequestHeader(key, value)
     })
 
+    let startTime = Date.now()
+    let lastLoaded = 0
+    let lastTime = Date.now()
+
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = Math.round((event.loaded / event.total) * 100)
         setUploadProgress(percentComplete)
+
+        // Calculate upload speed
+        const currentTime = Date.now()
+        const timeDiff = (currentTime - lastTime) / 1000 // seconds
+        const loadedDiff = event.loaded - lastLoaded
+
+        if (timeDiff > 0) {
+          const speedBytesPerSecond = loadedDiff / timeDiff
+          const speedMBPerSecond = speedBytesPerSecond / (1024 * 1024)
+          setUploadSpeed(speedMBPerSecond)
+
+          // Calculate ETA
+          const remainingBytes = event.total - event.loaded
+          const eta = remainingBytes / speedBytesPerSecond
+          setEstimatedTimeRemaining(eta)
+
+          lastLoaded = event.loaded
+          lastTime = currentTime
+        }
       }
     }
 
@@ -130,12 +170,16 @@ export default function ContentView({ content }: Props) {
       }
       setIsUploading(false)
       setUploadProgress(0)
+      setUploadSpeed(0)
+      setEstimatedTimeRemaining(0)
     }
 
     xhr.onerror = () => {
       showError("Upload error", "An error occurred while uploading the video")
       setIsUploading(false)
       setUploadProgress(0)
+      setUploadSpeed(0)
+      setEstimatedTimeRemaining(0)
     }
 
     xhr.send(formData)
@@ -268,7 +312,7 @@ export default function ContentView({ content }: Props) {
               <Button variant="outline" asChild>
                 <Link href={route("admin.shows.show", content.show.id)}>
                   <Tv className="mr-2 h-4 w-4" />
-                  Manage Seasons
+                  Manage Show
                 </Link>
               </Button>
             )}
@@ -415,7 +459,7 @@ export default function ContentView({ content }: Props) {
                   <CardHeader>
                     <CardTitle>Upload Video</CardTitle>
                     <CardDescription>
-                      Upload the main video file for this content.
+                      Upload the main video file for this content (max 2GB).
                       {['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0 && (
                         <span className="block mt-1 text-yellow-600 dark:text-yellow-500">
                           Note: Only one video allowed for this content type.
@@ -427,11 +471,13 @@ export default function ContentView({ content }: Props) {
                     <form onSubmit={handleVideoUpload} className="space-y-4">
                       <VideoUpload
                         label={`Video File (${content.type === "movie" ? "Full Movie" : content.type})`}
-                        description="MP4, WebM, MOV up to 500MB"
+                        description="MP4, WebM, MOV up to 2GB"
                         value={videoForm.data.video_file || undefined}
                         onChange={(file) => videoForm.setData("video_file", file)}
-                        maxSize={500}
+                        maxSize={2048}
                         progress={uploadProgress}
+                        uploadSpeed={uploadSpeed}
+                        estimatedTimeRemaining={estimatedTimeRemaining}
                         disabled={isUploading || (['movie', 'skit', 'afrimation', 'real_estate'].includes(content.type) && content.video_assets && content.video_assets.length > 0)}
                       />
 
@@ -508,11 +554,13 @@ export default function ContentView({ content }: Props) {
                         <form onSubmit={handleVideoUpload} className="space-y-4">
                           <VideoUpload
                             label="New Video File"
-                            description="MP4, WebM, MOV up to 500MB"
+                            description="MP4, WebM, MOV up to 2GB"
                             value={videoForm.data.video_file || undefined}
                             onChange={(file) => videoForm.setData("video_file", file)}
-                            maxSize={500}
+                            maxSize={2048}
                             progress={uploadProgress}
+                            uploadSpeed={uploadSpeed}
+                            estimatedTimeRemaining={estimatedTimeRemaining}
                             disabled={isUploading}
                           />
                           <div className="flex gap-2">
@@ -626,12 +674,19 @@ export default function ContentView({ content }: Props) {
                         {content.show?.total_episodes || 0} episode(s)
                       </CardDescription>
                     </div>
-                    <Button asChild>
-                      <Link href={route("admin.shows.show", content.show?.id || "")}>
+                    {content.show?.id ? (
+                      <Button asChild>
+                        <Link href={route("admin.shows.show", content.show.id)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Manage Show
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button disabled title="Show record not found. Please create a show record first.">
                         <Plus className="mr-2 h-4 w-4" />
                         Manage Show
-                      </Link>
-                    </Button>
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -778,12 +833,19 @@ export default function ContentView({ content }: Props) {
                       <p className="text-muted-foreground mb-6">
                         Create seasons and episodes for this show
                       </p>
-                      <Button asChild>
-                        <Link href={route("admin.shows.show", content.show?.id || "")}>
+                      {content.show?.id ? (
+                        <Button asChild>
+                          <Link href={route("admin.shows.show", content.show.id)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Seasons
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button disabled title="Show record not found. Please create a show record first.">
                           <Plus className="mr-2 h-4 w-4" />
                           Add Seasons
-                        </Link>
-                      </Button>
+                        </Button>
+                      )}
                     </div>
                   )}
                 </CardContent>

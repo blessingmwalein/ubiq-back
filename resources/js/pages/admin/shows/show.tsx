@@ -67,6 +67,9 @@ export default function ShowDetail({ show }: Props) {
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null)
   const [episodeVideoFile, setEpisodeVideoFile] = useState<File | null>(null)
   const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadSpeed, setUploadSpeed] = useState(0)
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0)
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false)
   const [selectedEpisodeVideos, setSelectedEpisodeVideos] = useState<Episode | null>(null)
 
@@ -192,22 +195,76 @@ export default function ShowDetail({ show }: Props) {
 
       // Upload video if provided
       if (episodeVideoFile) {
+        // Reset progress state
+        setUploadProgress(0)
+        setUploadSpeed(0)
+        setEstimatedTimeRemaining(0)
+
         const formData = new FormData()
         formData.append("file", episodeVideoFile)
         formData.append("folder", "episodes")
         formData.append("content_id", show.content_item_id.toString())
 
-        const uploadResponse = await fetch("/admin/upload/video", {
-          method: "POST",
-          body: formData,
-          headers: getCsrfHeaders(),
+        // Use XMLHttpRequest for progress tracking
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          let lastTime = Date.now()
+          let lastLoaded = 0
+
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = Math.round((event.loaded / event.total) * 100)
+              setUploadProgress(percentComplete)
+
+              // Calculate upload speed
+              const currentTime = Date.now()
+              const timeDiff = (currentTime - lastTime) / 1000 // seconds
+              const loadedDiff = event.loaded - lastLoaded
+              const speedBytesPerSecond = loadedDiff / timeDiff
+              const speedMBPerSecond = speedBytesPerSecond / (1024 * 1024)
+              setUploadSpeed(speedMBPerSecond)
+
+              // Calculate ETA
+              const remainingBytes = event.total - event.loaded
+              const eta = remainingBytes / speedBytesPerSecond
+              setEstimatedTimeRemaining(eta)
+
+              lastTime = currentTime
+              lastLoaded = event.loaded
+            }
+          })
+
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const uploadData = JSON.parse(xhr.responseText)
+              if (uploadData.success) {
+                resolve(uploadData)
+              } else {
+                reject(new Error(uploadData.message || "Failed to upload video"))
+              }
+            } else {
+              reject(new Error("Failed to upload video"))
+            }
+          })
+
+          xhr.addEventListener("error", () => {
+            reject(new Error("Network error during video upload"))
+          })
+
+          xhr.addEventListener("abort", () => {
+            reject(new Error("Video upload was cancelled"))
+          })
+
+          xhr.open("POST", "/admin/upload/video")
+
+          // Add CSRF token
+          const csrfHeaders = getCsrfHeaders()
+          Object.entries(csrfHeaders).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value as string)
+          })
+
+          xhr.send(formData)
         })
-
-        const uploadData = await uploadResponse.json()
-
-        if (!uploadResponse.ok || !uploadData.success) {
-          throw new Error(uploadData.message || "Failed to upload video")
-        }
       }
 
       // Prepare form data with uploaded thumbnail URL
@@ -605,7 +662,7 @@ export default function ShowDetail({ show }: Props) {
                                         }}
                                       >
                                         <Film className="h-3 w-3 mr-1" />
-                                        {episode.content_item.video_assets.length} video{episode.content_item.video_assets.length > 1 ? 's' : ''}
+                                        {episode.content_item?.video_assets?.length || 0} video{(episode.content_item?.video_assets?.length || 0) > 1 ? 's' : ''}
                                       </Badge>
                                     )}
                                   </div>
@@ -654,7 +711,7 @@ export default function ShowDetail({ show }: Props) {
 
         {/* Episode Dialog */}
         <Dialog open={episodeDialogOpen} onOpenChange={setEpisodeDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleEpisodeSubmit}>
               <DialogHeader>
                 <DialogTitle>
@@ -729,10 +786,13 @@ export default function ShowDetail({ show }: Props) {
 
                 <VideoUpload
                   label="Episode Video"
-                  description="MP4, WebM, MOV up to 500MB"
+                  description="MP4, WebM, MOV up to 2GB"
                   value={episodeVideoFile || undefined}
                   onChange={(file) => setEpisodeVideoFile(file)}
-                  maxSize={500}
+                  maxSize={2048}
+                  progress={uploadProgress}
+                  uploadSpeed={uploadSpeed}
+                  estimatedTimeRemaining={estimatedTimeRemaining}
                 />
 
                 <div>
@@ -745,17 +805,38 @@ export default function ShowDetail({ show }: Props) {
                 </div>
               </div>
 
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setEpisodeDialogOpen(false)}
-                  disabled={isUploadingVideo}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={episodeForm.processing || isUploadingVideo}>
-                  {isUploadingVideo ? "Uploading video..." : editingEpisode ? "Update" : "Create"} Episode
-                </Button>
+              <DialogFooter className="flex-col gap-2">
+                {isUploadingVideo && uploadProgress > 0 && (
+                  <div className="w-full space-y-2 pb-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Uploading video... {uploadProgress}%</span>
+                      {uploadSpeed > 0 && (
+                        <span className="text-muted-foreground">
+                          {uploadSpeed.toFixed(1)} MB/s
+                        </span>
+                      )}
+                    </div>
+                    {estimatedTimeRemaining > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {estimatedTimeRemaining < 60
+                          ? `${Math.ceil(estimatedTimeRemaining)} seconds remaining`
+                          : `${Math.ceil(estimatedTimeRemaining / 60)} minutes remaining`}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-2 w-full justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEpisodeDialogOpen(false)}
+                    disabled={isUploadingVideo}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={episodeForm.processing || isUploadingVideo}>
+                    {isUploadingVideo ? "Uploading video..." : editingEpisode ? "Update" : "Create"} Episode
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           </DialogContent>

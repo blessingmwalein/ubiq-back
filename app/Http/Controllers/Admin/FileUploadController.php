@@ -50,10 +50,19 @@ class FileUploadController extends Controller
      */
     public function uploadVideo(Request $request)
     {
+        // Validate file size (2GB = 2097152 KB)
         $request->validate([
-            'file' => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm|max:5120000', // 5GB max
+            'file' => [
+                'required',
+                'file',
+                'mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/webm',
+                'max:2097152', // 2GB in KB
+            ],
             'folder' => 'nullable|string',
             'content_id' => 'nullable|exists:content_items,id',
+        ], [
+            'file.max' => 'Video file size must not exceed 2GB (2048MB). Please select a smaller file.',
+            'file.mimetypes' => 'Invalid video format. Supported formats: MP4, MOV, AVI, WMV, WebM.',
         ]);
 
         $file = $request->file('file');
@@ -103,6 +112,7 @@ class FileUploadController extends Controller
             'path' => Storage::disk('public')->url($relativePath),
             'filename' => $filename,
             'size' => $file->getSize(),
+            'size_mb' => round($file->getSize() / 1024 / 1024, 2),
             'metadata' => $metadata,
             'video_asset_id' => $videoAsset?->id,
         ]);

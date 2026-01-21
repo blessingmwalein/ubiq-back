@@ -20,11 +20,11 @@ interface ContentFormProps {
 export default function ContentForm({ content, categories, providers }: ContentFormProps) {
     const { success, error: showError } = useToast()
     const [isSubmitting, setIsSubmitting] = useState(false)
-    
+
     // Parse genres from comma-separated string to array
     const contentWithGenre = content as ContentItem & { genre?: string };
     const initialGenres = contentWithGenre?.genre ? contentWithGenre.genre.split(',').map((g: string) => g.trim()) : [];
-    
+
     const [formData, setFormData] = useState({
         title: content?.title || '',
         description: content?.description || '',
@@ -58,7 +58,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
         formData.append('folder', folder);
 
         const endpoint = type === 'image' ? '/admin/upload/image' : '/admin/upload/video';
-        
+
         const response = await fetch(endpoint, {
             method: 'POST',
             body: formData,
@@ -66,7 +66,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
         });
 
         const data = await response.json();
-        
+
         if (!response.ok || !data.success) {
             throw new Error(data.message || 'Upload failed');
         }
@@ -77,10 +77,10 @@ export default function ContentForm({ content, categories, providers }: ContentF
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        
+
         try {
             const finalFormData = { ...formData };
-            
+
             // Convert genre array to comma-separated string
             const genreString = Array.isArray(finalFormData.genre) ? finalFormData.genre.join(', ') : '';
             const submissionData: any = {
@@ -96,7 +96,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
                 // User explicitly removed the poster
                 submissionData.poster_url = null;
             }
-            
+
             if (files.backdrop) {
                 success('Uploading backdrop...', '');
                 submissionData.backdrop_url = await uploadFile(files.backdrop, 'image', 'backdrops');
@@ -104,7 +104,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
                 // User explicitly removed the backdrop
                 submissionData.backdrop_url = null;
             }
-            
+
             if (files.thumbnail) {
                 success('Uploading thumbnail...', '');
                 submissionData.thumbnail_url = await uploadFile(files.thumbnail, 'image', 'thumbnails');
@@ -112,7 +112,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
                 // User explicitly removed the thumbnail
                 submissionData.thumbnail_url = null;
             }
-            
+
             if (files.trailer) {
                 success('Uploading trailer...', '');
                 submissionData.trailer_url = await uploadFile(files.trailer, 'video', 'trailers');
@@ -413,8 +413,8 @@ export default function ContentForm({ content, categories, providers }: ContentF
 
                         <div className="md:col-span-2">
                             <VideoUpload
-                                label="Trailer Video"
-                                description="MP4, WebM, MOV up to 100MB"
+                                label="Trailer Video (Optional)"
+                                description="MP4, WebM, MOV up to 2GB"
                                 value={files.trailer || formData.trailer_url}
                                 onChange={(file) => {
                                     setFiles({ ...files, trailer: file });
@@ -422,7 +422,7 @@ export default function ContentForm({ content, categories, providers }: ContentF
                                         setFormData({ ...formData, trailer_url: '' });
                                     }
                                 }}
-                                maxSize={100}
+                                maxSize={2048}
                             />
                             {formData.trailer_url && !files.trailer && (
                                 <p className="mt-2 text-xs text-gray-500">Current: {formData.trailer_url}</p>

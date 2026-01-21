@@ -28,7 +28,21 @@ class ContentService
     public function createContent(CreateContentDTO $dto): ContentItem
     {
         return DB::transaction(function () use ($dto) {
-            return $this->contentRepository->create($dto->toArray());
+            $content = $this->contentRepository->create($dto->toArray());
+            
+            // Auto-create Show record if content type is 'show'
+            if ($content->type === 'show') {
+                $content->show()->create([
+                    'total_seasons' => 0,
+                    'total_episodes' => 0,
+                    'status' => 'ongoing',
+                ]);
+                
+                // Reload the content with the show relationship
+                $content->load('show');
+            }
+            
+            return $content;
         });
     }
 
